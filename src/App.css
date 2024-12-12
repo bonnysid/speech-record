@@ -93,6 +93,7 @@ body {
 
 .text {
   color: #fff;
+  max-width: 600px;
 }
 
 .button:hover {

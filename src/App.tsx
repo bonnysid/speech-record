@@ -85,7 +85,7 @@ function App() {
   }, [transcript, textToCompare]);
 
   return (
-    <div className="App" style={{ '--volume-scale': isRecording ? ((volume * 10) + 50) / 100 : 0.5 } as React.CSSProperties}>
+    <div className="App" style={{ '--volume-scale': isRecording ? ((volume * 5) + 50) / 100 : 0.5 } as React.CSSProperties}>
       <div className="content">
         <label className="input-wrapper">
           <span className="input-caption">Текст для сравнения</span>
@@ -96,10 +96,10 @@ function App() {
             {isRecording ? 'Остановить' : 'Начать'} запись
           </button>
         </div>
+        <div className="accuracy">Точность: {accuracy.toFixed(2)}%</div>
         <div className="text">
           {transcript}
         </div>
-        <div className="accuracy">Точность: {accuracy.toFixed(2)}%</div>
       </div>
     </div>
   );
