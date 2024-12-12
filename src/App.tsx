@@ -7,10 +7,28 @@ function App() {
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [recognition, setRecognition] = useState<any | null>(null);
   const [textToCompare, setTextToCompare] = useState('');
+  const [volume, setVolume] = useState<number>(0); // Для уровня громкости
 
   useEffect(() => {
     // Проверяем поддержку Web Speech API
-    navigator.mediaDevices.getUserMedia({ audio: true })
+    navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+      const audioContext = new AudioContext();
+      const analyser = audioContext.createAnalyser();
+      const microphone = audioContext.createMediaStreamSource(stream);
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+      analyser.fftSize = 256;
+      microphone.connect(analyser);
+
+      const updateVolume = () => {
+        analyser.getByteFrequencyData(dataArray);
+        const avgVolume = dataArray.reduce((a, b) => a + b) / dataArray.length;
+        setVolume(avgVolume); // Обновляем громкость
+        requestAnimationFrame(updateVolume);
+      };
+
+      updateVolume();
+    })
       .catch((err) => {
         console.error('Microphone access denied:', err);
         alert('Access to microphone is required for speech recognition.');
@@ -24,7 +42,7 @@ function App() {
     const recognitionInstance = new ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition)();
     recognitionInstance.lang = 'ru-RU';
     recognitionInstance.interimResults = true;
-    recognitionInstance.continuous = false;
+    recognitionInstance.continuous = true;
 
     // Обработчик распознавания
     recognitionInstance.onresult = (event: any) => {
@@ -61,24 +79,28 @@ function App() {
   };
 
   const accuracy = useMemo(() => {
-    return compareText(transcript, textToCompare);
+    const res = compareText(transcript.toLowerCase(), textToCompare.toLowerCase());
+
+    return isNaN(res) ? 0 : res;
   }, [transcript, textToCompare]);
 
   return (
-    <div>
-      <h2>Speech Recognition Demo</h2>
-      <label>
-        <span>Текст для сравнения:</span>
-        <input type="text" value={textToCompare} onChange={e => setTextToCompare(e.target.value)} />
-      </label>
-      <button onClick={startRecognition} disabled={isRecording}>
-        Start Recording
-      </button>
-      <button onClick={stopRecognition} disabled={!isRecording}>
-        Stop Recording
-      </button>
-      <p><strong>Recognized Text:</strong> {transcript}</p>
-      <p>Accuracy: {accuracy.toFixed(2)}%</p>
+    <div className="App" style={{ '--volume-scale': isRecording ? ((volume * 10) + 50) / 100 : 0.5 } as React.CSSProperties}>
+      <div className="content">
+        <label className="input-wrapper">
+          <span className="input-caption">Текст для сравнения</span>
+          <input className="input" type="text" value={textToCompare} onChange={e => setTextToCompare(e.target.value)} />
+        </label>
+        <div className="buttons">
+          <button onClick={isRecording ? stopRecognition : startRecognition} className={`button ${isRecording ? 'isRecording' : ''}`}>
+            {isRecording ? 'Остановить' : 'Начать'} запись
+          </button>
+        </div>
+        <div className="text">
+          {transcript}
+        </div>
+        <div className="accuracy">Точность: {accuracy.toFixed(2)}%</div>
+      </div>
     </div>
   );
 }
