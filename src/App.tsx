@@ -8,6 +8,7 @@ function App() {
   const [recognition, setRecognition] = useState<any | null>(null);
   const [textToCompare, setTextToCompare] = useState('');
   const [volume, setVolume] = useState<number>(0); // Для уровня громкости
+  const [uploadedAudio, setUploadedAudio] = useState<File | null>(null); // Загруженный
 
   useEffect(() => {
     // Проверяем поддержку Web Speech API
@@ -78,6 +79,31 @@ function App() {
     }
   };
 
+  const handleAudioUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setUploadedAudio(file);
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        const response = await fetch('http://localhost:5000/transcribe', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to process audio');
+        }
+
+        const data = await response.json();
+        setTranscript(data.transcript); // Установить распознанный текст
+      } catch (error) {
+        console.error('Error processing audio:', error);
+      }
+    }
+  };
+
   const accuracy = useMemo(() => {
     const res = compareText(transcript.toLowerCase(), textToCompare.toLowerCase());
 
@@ -88,8 +114,18 @@ function App() {
     <div className="App" style={{ '--volume-scale': isRecording ? ((volume * 5) + 50) / 100 : 0.5 } as React.CSSProperties}>
       <div className="content">
         <label className="input-wrapper">
+          <span className="input-caption">Загрузить аудио-файл</span>
+          <input type="file" accept="audio/*" onChange={handleAudioUpload} />
+          {uploadedAudio && (
+            <audio controls>
+              <source src={URL.createObjectURL(uploadedAudio)} type="audio/mpeg" />
+              Ваш браузер не поддерживает аудио-воспроизведение.
+            </audio>
+          )}
+        </label>
+        <label className="input-wrapper">
           <span className="input-caption">Текст для сравнения</span>
-          <input className="input" type="text" value={textToCompare} onChange={e => setTextToCompare(e.target.value)} />
+          <textarea className="input" value={textToCompare} onChange={e => setTextToCompare(e.target.value)} />
         </label>
         <div className="buttons">
           <button onClick={isRecording ? stopRecognition : startRecognition} className={`button ${isRecording ? 'isRecording' : ''}`}>
