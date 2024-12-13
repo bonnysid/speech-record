@@ -1,14 +1,36 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import './App.css';
 import { compareText } from './compareText';
+import { RecordPage } from './RecordPage';
+import { ReportsPage } from './ReportsPage';
+
+enum Tabs {
+  RECORD = 'record',
+  REPORTS = 'reports',
+}
+
+const TEXT_BY_TAB: Record<Tabs, string> = {
+  [Tabs.REPORTS]: 'Загрузка аудио',
+  [Tabs.RECORD]: 'Запись аудио',
+}
 
 function App() {
   const [transcript, setTranscript] = useState<string>('');
+  const [currentTab, setCurrentTab] = useState(Tabs.RECORD);
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [recognition, setRecognition] = useState<any | null>(null);
   const [textToCompare, setTextToCompare] = useState('');
   const [volume, setVolume] = useState<number>(0); // Для уровня громкости
   const [uploadedAudio, setUploadedAudio] = useState<File | null>(null); // Загруженный
+
+  const renderedTabContent = useMemo(() => {
+    switch (currentTab) {
+      case Tabs.RECORD:
+        return <RecordPage />
+      case Tabs.REPORTS:
+        return <ReportsPage />
+    }
+  }, [currentTab]);
 
   useEffect(() => {
     // Проверяем поддержку Web Speech API
@@ -79,12 +101,10 @@ function App() {
     }
   };
 
-  const handleAudioUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setUploadedAudio(file);
+  const fetchAudioInfo = async () => {
+    if (uploadedAudio) {
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('file', uploadedAudio);
 
       try {
         const response = await fetch('http://localhost:5000/transcribe', {
@@ -98,44 +118,64 @@ function App() {
 
         const data = await response.json();
         setTranscript(data.transcript); // Установить распознанный текст
-      } catch (error) {
-        console.error('Error processing audio:', error);
+      } catch (e) {
+        console.log(e);
       }
+    }
+  }
+
+  const handleAudioUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setUploadedAudio(file);
     }
   };
 
   const accuracy = useMemo(() => {
-    const res = compareText(transcript.toLowerCase(), textToCompare.toLowerCase());
+    const res = compareText(transcript.trim().toLowerCase(), textToCompare.trim().toLowerCase());
 
     return isNaN(res) ? 0 : res;
   }, [transcript, textToCompare]);
 
   return (
-    <div className="App" style={{ '--volume-scale': isRecording ? ((volume * 5) + 50) / 100 : 0.5 } as React.CSSProperties}>
-      <div className="content">
-        <label className="input-wrapper">
-          <span className="input-caption">Загрузить аудио-файл</span>
-          <input type="file" accept="audio/*" onChange={handleAudioUpload} />
-          {uploadedAudio && (
-            <audio controls>
-              <source src={URL.createObjectURL(uploadedAudio)} type="audio/mpeg" />
-              Ваш браузер не поддерживает аудио-воспроизведение.
-            </audio>
-          )}
-        </label>
-        <label className="input-wrapper">
-          <span className="input-caption">Текст для сравнения</span>
-          <textarea className="input" value={textToCompare} onChange={e => setTextToCompare(e.target.value)} />
-        </label>
-        <div className="buttons">
-          <button onClick={isRecording ? stopRecognition : startRecognition} className={`button ${isRecording ? 'isRecording' : ''}`}>
-            {isRecording ? 'Остановить' : 'Начать'} запись
+    <div className="App">
+      <header className="header">
+        {Object.values(Tabs).map(tab => (
+          <button key={tab} className={`tab ${currentTab === tab? 'active' : ''}`} onClick={() => setCurrentTab(tab)}>
+            {TEXT_BY_TAB[tab]}
           </button>
-        </div>
-        <div className="accuracy">Точность: {accuracy.toFixed(2)}%</div>
-        <div className="text">
-          {transcript}
-        </div>
+        ))}
+      </header>
+      <div className="content">
+        {renderedTabContent}
+        {/*<label className="input-wrapper">*/}
+        {/*  <span className="input-caption">Загрузить аудио-файл</span>*/}
+        {/*  <input type="file" accept="audio/*" onChange={handleAudioUpload} />*/}
+        {/*  {uploadedAudio && (*/}
+        {/*    <audio controls>*/}
+        {/*      <source src={URL.createObjectURL(uploadedAudio)} type="audio/mpeg" />*/}
+        {/*      Ваш браузер не поддерживает аудио-воспроизведение.*/}
+        {/*    </audio>*/}
+        {/*  )}*/}
+        {/*</label>*/}
+        {/*<label className="input-wrapper">*/}
+        {/*  <span className="input-caption">Текст для сравнения</span>*/}
+        {/*  <textarea className="input" value={textToCompare} onChange={e => setTextToCompare(e.target.value)} />*/}
+        {/*</label>*/}
+        {/*<div className="buttons">*/}
+        {/*  <button onClick={isRecording ? stopRecognition : startRecognition} className={`button ${isRecording ? 'isRecording' : ''}`}>*/}
+        {/*    {isRecording ? 'Остановить' : 'Начать'} запись*/}
+        {/*  </button>*/}
+        {/*  {Boolean(uploadedAudio) && (*/}
+        {/*    <button onClick={fetchAudioInfo} className={`button`}>*/}
+        {/*      Получить текст из аудио*/}
+        {/*    </button>*/}
+        {/*  )}*/}
+        {/*</div>*/}
+        {/*<div className="accuracy">Точность: {accuracy.toFixed(2)}%</div>*/}
+        {/*<div className="text">*/}
+        {/*  {transcript}*/}
+        {/*</div>*/}
       </div>
     </div>
   );
